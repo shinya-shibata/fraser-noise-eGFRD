@@ -1,0 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ==========================================
+# 1. パラメータ設定
+# ==========================================
+np.random.seed(42)
+
+# 物理パラメータ (無次元化あるいは微小スケール)
+m_eff = 1.0          # 付加質量を含めた有効質量 m*
+gamma_0 = 6.0        # 定常ストークス摩擦係数 (6*pi*eta*a)
+tau_f = 0.5          # 流体の特性時間スケール
+
+# シミュレーション設定
+T_max = 20.0
+dt = 0.01
+N_steps = int(T_max / dt)
+time_array = np.linspace(0, T_max, N_steps)
+
+# ------------------------------------------
+# メモリカーネル K(t) \propto 1/sqrt(t) の指数関数近似 (3項近似)
+# K(t) \approx \sum w_k * exp(-t / \tau_k)
+# ------------------------------------------
+# 簡易的にカーネルの遅延効果を代表する時定数と重みを設定
+tau_k = np.array([0.1 * tau_f, 1.0 * tau_f, 10.0 * tau_f])
+weights = np.array([0.5, 1.0, 0.2]) * (gamma_0 * np.sqrt(tau_f))
+
+N_modes = len(tau_k)
+
+# 変数の初期化
+pre_v = 0.0          # 初期速度 v(0) = 0
+v_array = np.zeros(N_steps)
+# 記憶効果を保持するための補助変数 (各モードごと)
+y_modes = np.zeros((N_modes, N_sim := 1)) 
+
+# 結果格納配列
+v_history = np.zeros(N_steps)
+
+# 外力 (例: t=2 から t=3 まで一定の力を加えるパルス応答テスト)
+F_ext = np.zeros(N_steps)
+F_ext[(time_array >= 2.0) & (time_array <= 3.0)] = 5.0
+
+# ==========================================
+# 2. 時間発展計算 (補助変数法による O(N) 計算)
+# ==========================================
+v = 0.0
+
+for i in range(0, N_steps - 1):
+    # --- 1. ノイズおよび履歴力の計算 ---
+    # 揺らぎ散逸定理を満たすカラーノイズの簡易生成と、記憶項の和
+    # 各モードの補助変数 y_modes が「過去の履歴」を代表している
+    history_force = - np.sum(y_modes)
+    
+    # ハイドロダイナミックな揺らぎ (各モードからの熱ノイズへの寄与)
+    # 本来は重みと時定数に応じた揺らぎ散逸定理に基づくガウス乱数
+    fluc_noise = np.sum(np.random.normal(0, np.sqrt(2.0 * weights * dt / tau_k)))
+    
+    # --- 2. 速度 v の更新 (オイラー法) ---
+    total_force = - gamma_0 * v + history_force + F_ext[i] + fluc_noise
+    dv = (total_force / m_eff) * dt
+    v_next = v + dv
+    
+    # --- 3. 補助変数（記憶）の更新 (マルコフ的な微分方程式) ---
+    # dy_k/dt = - y_k / \tau_k + w_k * v
+    for k in range(N_modes):
+        dy_mode = (- y_modes[k] / tau_k[k] + weights[k] * v) * dt
+        y_modes[k] += dy_mode
+        
+    v = v_next
+    v_history[i+1] = v
+
+# ==========================================
+# 3. プロット
+# ==========================================
+plt.figure(figsize=(10, 5))
+plt.plot(time_array, F_ext, 'r--', label='External Force (Pulse)', alpha=0.7)
+plt.plot(time_array, v_history, 'b-', label='Particle Velocity $v(t)$ (with Memory)')
+plt.xlabel('Time $t$')
+plt.ylabel('Response')
+plt.title('Velocity Response with Hydrodynamic Memory Effect')
+plt.legend()
+plt.grid(True)
+plt.show()
