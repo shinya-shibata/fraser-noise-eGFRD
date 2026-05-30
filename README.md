@@ -1,1 +1,80 @@
 # fraser-noise-eGFRD
+# noise of T
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ==========================================
+# 1. パラメータ設定
+# ==========================================
+np.random.seed(42)  # 再現性のためのシード固定
+
+tau_c = 1e-4        # 温度相関時間 (s)
+T_max = 5 * tau_c   # シミュレーション全時間 (相関時間の5倍程度)
+dt = tau_c / 100    # 時間ステップ (精度確保のため tau_c より十分小さく)
+N_steps = int(T_max / dt)
+N_simulations = 1000 # アンサンブル平均のためのシミュレーション回数
+
+# 揺らぎの期待値 <(\delta T)^2> = 1 となるように \sigma を設定
+# \sigma = \sqrt{2 / \tau_c}
+sigma = np.sqrt(2.0 / tau_c)
+
+time_array = np.linspace(0, T_max, N_steps)
+
+# 結果格納用配列 (形状: [シミュレーション回数, 時間ステップ数])
+delta_T_all = np.zeros((N_simulations, N_steps))
+
+# ==========================================
+# 2. 数値計算 (Euler-Maruyama法)
+# ==========================================
+# 初期条件: delta_T(0) = 0
+delta_T_all[:, 0] = 0.0 
+
+for i in range(0, N_steps - 1):
+    # 標準正規乱数 Z_i ~ N(0, 1) の生成 (全シミュレーション分を一括生成)
+    Z = np.random.normal(0, 1, size=N_simulations)
+    
+    # 現ステップの値
+    dT_current = delta_T_all[:, i]
+    
+    # 決定論的ドリフト項と確率的ノイズ項 (dW_i ~ Z * \sqrt{dt})
+    drift = - (1.0 / tau_c) * dT_current * dt
+    diffusion = sigma * np.sqrt(dt) * Z
+    
+    # 次のステップへ更新
+    delta_T_all[:, i + 1] = dT_current + drift + diffusion
+
+# ==========================================
+# 3. 統計量の計算とプロット
+# ==========================================
+# アンサンブル平均と分散の計算
+mean_dT = np.mean(delta_T_all, axis=0)
+var_dT = np.var(delta_T_all, axis=0)
+
+# 理論的な分散の時間発展: <(\delta T(t))^2> = (\sigma^2 * \tau_c / 2) * (1 - e^{-2t/\tau_c})
+# 今回は \sigma^2 * \tau_c / 2 = 1 に設定しているため、1 - e^{-2t/\tau_c} になる
+theoretical_var = 1.0 * (1.0 - np.exp(-2.0 * time_array / tau_c))
+
+# 描画
+plt.figure(figsize=(12, 5))
+
+# 軌跡のプロット (最初の5本のサンプル)
+plt.subplot(1, 2, 1)
+for j in range(5):
+    plt.plot(time_array * 1e4, delta_T_all[j, :], alpha=0.7, label==f"Path {j+1}" if j==0 else "")
+plt.axhline(0, color='gray', linestyle='--')
+plt.xlabel('Time ($10^{-4}$ s)')
+plt.ylabel('$\delta T(t)$')
+plt.title('Stochastic Trajectories of $\delta T(t)$')
+
+# 分散の収束確認
+plt.subplot(1, 2, 2)
+plt.plot(time_array * 1e4, var_dT, label='Simulation Variance', color='blue', lw=2)
+plt.plot(time_array * 1e4, theoretical_var, label='Theoretical Variance', color='red', linestyle='--', lw=2)
+plt.xlabel('Time ($10^{-4}$ s)')
+plt.ylabel('Variance $\langle (\delta T)^2 \rangle$')
+plt.title('Variance Evolution vs Theory')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
