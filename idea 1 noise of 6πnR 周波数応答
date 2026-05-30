@@ -1,0 +1,33 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# パラメータ
+eta = 1.0      # 粘性係数
+a = 1.0        # 粒子半径
+tau_f = 1.0    # 流体特性時間（変えて影響を見る）
+
+w = np.logspace(-2, 3, 1000)  # 周波数範囲
+
+alpha = np.sqrt(1j * w * tau_f)
+gamma_hat = 6 * np.pi * eta * a * (1 + alpha + alpha**2 / 9)
+
+mag = np.abs(gamma_hat) / (6*np.pi*eta*a)   # 正規化
+phase = np.angle(gamma_hat, deg=True)
+
+# プロット
+fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+
+ax[0].semilogx(w, mag)
+ax[0].set_xlabel('周波数 w')
+ax[0].set_ylabel('正規化抵抗 |γ̂(w)| / (6πηa)')
+ax[0].grid(True)
+ax[0].set_title('振幅応答')
+
+ax[1].semilogx(w, phase)
+ax[1].set_xlabel('周波数 w')
+ax[1].set_ylabel('位相 [deg]')
+ax[1].grid(True)
+ax[1].set_title('位相遅れ')
+
+plt.tight_layout()
+plt.show()
