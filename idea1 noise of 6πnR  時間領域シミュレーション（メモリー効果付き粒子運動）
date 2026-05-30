@@ -1,0 +1,51 @@
+import numpy as np
+from scipy.integrate import cumtrapz
+import matplotlib.pyplot as plt
+
+# パラメータ
+m = 1.0        # 粒子質量
+eta = 1.0
+a = 1.0
+tau_f = 1.0
+gamma0 = 6 * np.pi * eta * a  # Stokes摩擦
+
+dt = 0.01
+T = 20.0
+t = np.arange(0, T, dt)
+N = len(t)
+
+# 外力：例として正弦波 + ステップ
+F_ext = 5.0 * np.sin(2*np.pi*0.2*t) + 3.0*(t > 5)
+
+# 速度の時間発展（簡易的メモリー付き）
+v = np.zeros(N)
+v_mem = np.zeros(N)  # メモリー効果近似
+
+for i in range(1, N):
+    # Bassetメモリー項の簡易計算（過去の加速度の積分）
+    if i > 1:
+        # 簡略化：√(τ_f / (π(t-τ))) 型のカーネル近似
+        kernel = 1.0 / np.sqrt(np.maximum(t[:i], 1e-6))
+        mem_term = np.sum(v[:i] * kernel) * dt / np.sqrt(np.pi * tau_f)
+    else:
+        mem_term = 0
+    
+    dvdt = (F_ext[i] - gamma0 * v[i-1] - gamma0 * mem_term * np.sqrt(dt)) / m
+    v[i] = v[i-1] + dvdt * dt
+
+# 通常Stokesの場合（比較用）
+v_stokes = np.zeros(N)
+for i in range(1, N):
+    dvdt = (F_ext[i] - gamma0 * v_stokes[i-1]) / m
+    v_stokes[i] = v_stokes[i-1] + dvdt * dt
+
+plt.figure(figsize=(10, 6))
+plt.plot(t, v, label='メモリー効果あり (Hydrodynamic Memory)', lw=2)
+plt.plot(t, v_stokes, '--', label='通常Stokes抵抗 (メモリーなし)', lw=2)
+plt.plot(t, F_ext/5, 'k:', label='外力 (スケール調整)', alpha=0.7)
+plt.xlabel('時間 t')
+plt.ylabel('粒子速度 v')
+plt.legend()
+plt.grid(True)
+plt.title('ハイドロダイナミック・メモリー効果の影響')
+plt.show()
