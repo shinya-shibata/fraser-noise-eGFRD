@@ -1,0 +1,56 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# 1. パラメータの設定
+D = 10.0          # 粒子径 (micro-meters)
+Phi = 0.20        # 体積分率 (20%)
+Phi_max = 0.64    # 最大充填率 (RCPを想定)
+sigma = 0.20      # 尺度パラメータ (20%の不確実さ)
+num_samples = 100000  # モンテカルロサンプリング数
+
+# 決定論的な幾何学的中心値 L* の計算
+L_star = D * ((Phi_max / Phi)**(1/3) - 1)
+print(f"決定論的予測値 (L*): {L_star:.4f} μm")
+
+# 2. 誤差変数 e のサンプリング (2パターン)
+np.random.seed(42)  # 再現性のためのシード固定
+
+# パターンA: 標準正規分布
+e_normal = np.random.normal(0, 1, num_samples)
+# パターンB: t分布 (自由度 k=3 : 外れ値が出やすい重い裾を再現)
+df_k = 3
+e_t = np.random.standard_t(df_k, num_samples)
+
+# 3. 確率論的粒子間距離 L の計算
+L_normal = L_star * np.exp(sigma * e_normal)
+L_t = L_star * np.exp(sigma * e_t)
+
+# 4. 統計量の算出と出力
+def print_stats(name, L_array):
+    print(f"\n--- {name} 誤差モデルの統計量 ---")
+    print(f"最小値: {np.min(L_array):.4f} μm")
+    print(f"最大値: {np.max(L_array):.4f} μm")
+    print(f"中央値: {np.median(L_array):.4f} μm (理論上のL*に近接)")
+    print(f"算術平均値: {np.mean(L_array):.4f} μm (対数正規のバイアスを反映)")
+    print(f"標準偏差: {np.std(L_array):.4f} μm")
+
+print_stats("標準正規分布", L_normal)
+print_stats(f"t分布 (自由度k={df_k})", L_t)
+
+# 5. 結果の可視化 (ヒストグラム)
+plt.figure(figsize=(12, 6))
+
+# 標準正規誤差による分布 (対数正規分布を形成)
+plt.hist(L_normal, bins=100, density=True, alpha=0.6, color='blue', label='Normal error (Log-Normal)')
+# t分布誤差による分布 (より重い裾を持つ非対称分布)
+plt.hist(L_t, bins=500, density=True, alpha=0.6, color='orange', label=f't-distribution error (df={df_k})')
+
+plt.axvline(L_star, color='red', linestyle='--', linewidth=2, label=f'Deterministic L* ({L_star:.2f} μm)')
+plt.title('Simulation of Stochastic Interparticle Distance $L$')
+plt.xlabel('Interparticle Distance $L$ (μm)')
+plt.ylabel('Probability Density')
+plt.xlim(0, L_star * 3)  # 見やすさのために表示範囲を制限
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
