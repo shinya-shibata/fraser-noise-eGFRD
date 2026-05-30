@@ -1,0 +1,12 @@
+def analytical_stats(L0, sigma):
+    """対数正規分布の解析的期待値・分散"""
+    exp_term = np.exp(0.5 * sigma**2)
+    mean = L0 * exp_term
+    var = L0**2 * exp_term**2 * (exp_term - 1)  # unbiased版なら mean=L0
+    return mean, var
+
+# 90%信頼区間（解析的）
+z = 1.645
+lower = L0 * np.exp(-z * sigma)
+upper = L0 * np.exp(+z * sigma)
+print(f"90% CI: [{lower:.4f}, {upper:.4f}]")
