@@ -1,5 +1,5 @@
 # fraser-noise-eGFRD
-# noise of T
+# idea1 noise of T
 
 import numpy as np
 import matplotlib.pyplot as plt
